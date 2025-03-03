@@ -7,7 +7,7 @@ const port = process.env.PORT || 9000
 const app = express()
 const cookieParser = require('cookie-parser')
 const corsOptions = {
-//   origin: ['http://localhost:5173'],
+  // origin: ['http://localhost:5173'],
   credentials: true,
   optionalSuccessStatus: 200,
 }
@@ -83,6 +83,14 @@ async function run() {
       res.send(result)
     })
 
+    app.get('/marathonss', async (req, res) => {
+      const { createdBy } = req.query;  // এখানে createdBy আসছে কিনা চেক করো
+  
+      const marathons = await MerathonCOllection.find({ createdBy }).toArray();
+      res.send(marathons);
+  });
+  
+
     // // get all jobs data from db
     app.get('/marathons', async (req, res) => {
       const result = await MerathonCOllection.find().toArray()
@@ -105,19 +113,40 @@ async function run() {
         res.send(result)
       })
 
+      const { ObjectId } = require('mongodb');
 
-    app.put('/marathons/:id', async (req, res) => {
-        const id = req.params.id
-        const merathonData = req.body
-        const updated = {
-          $set: merathonData,
-        }
-        const query = { _id: new ObjectId(id) }
-        const options = { upsert: true }
-        const result = await MerathonCOllection.updateOne(query, updated, options)
-        console.log(result)
-        res.send(result)
-      })
+app.put('/marathons/:id', async (req, res) => {
+    try {
+        const id = req.params.id;
+        const { _id, ...merathonData } = req.body; // _id ফিল্ড বাদ দিয়ে বাকি ডাটা নিন
+
+        const query = { _id: new ObjectId(id) };
+        const updated = { $set: merathonData };
+        const options = { upsert: true };
+
+        const result = await MerathonCOllection.updateOne(query, updated, options);
+        console.log(result);
+        res.send(result);
+    } catch (error) {
+        console.error('Error updating marathon:', error);
+        res.status(500).send({ message: 'Internal Server Error', error });
+    }
+});
+
+
+
+    // app.put('/marathons/:id', async (req, res) => {
+    //     const id = req.params.id
+    //     const merathonData = req.body
+    //     const updated = {
+    //       $set: merathonData,
+    //     }
+    //     const query = { _id: new ObjectId(id) }
+    //     const options = { upsert: true }
+    //     const result = await MerathonCOllection.updateOne(query, updated, options)
+    //     console.log(result)
+    //     res.send(result)
+    //   })
 
     // // get a single job data by id from db
     app.get('/marathon/:id', async (req, res) => {
@@ -128,14 +157,109 @@ async function run() {
     })
 
 
-
-
     app.post('/register', async (req, res) => {
-        const merathonData = req.body
-        const result = await registerCollection.insertOne(merathonData)
-        console.log(result)
+      try {
+          console.log("Received Data:", req.body);
+  
+          const { marathonId } = req.body;
+  
+          if (!ObjectId.isValid(marathonId)) {
+              res.send({ message: "Invalid marathonId" });
+              return;
+          }
+  
+          // ✅ রেজিস্ট্রেশন ইনসার্ট করা
+          const insertResult = await registerCollection.insertOne(req.body);
+          console.log("Insert Result:", insertResult);
+  
+          if (!insertResult.acknowledged) {
+              res.send({ message: "Failed to insert registration" });
+              return;
+          }
+  
+          // ✅ মোট রেজিস্ট্রেশন সংখ্যা ১ বাড়ানো
+          const updatedMarathon = await MerathonCOllection.findOneAndUpdate(
+              { _id: new ObjectId(marathonId) },
+              { $inc: { totalRegistrations: 1 } },
+              { returnDocument: 'after' }
+          );
+  
+          console.log("Updated Marathon:", updatedMarathon);
+  
+          if (!updatedMarathon.value) {
+              res.send({ message: "Marathon not found" });
+              return;
+          }
+  
+          res.send({ 
+              message: 'Registration successful', 
+              updatedTotal: updatedMarathon.value.totalRegistrations 
+          });
+  
+      } catch (error) {
+          console.error('Registration Error:', error);
+          res.send({ message: 'Registration failed', error: error.message });
+      }
+  });
+  
+
+
+
+  //   app.post('/register', async (req, res) => {
+  //     try {
+  //         const { marathonId, email, firstName, lastName, contactNumber, additionalInfo, selectedDate } = req.body;
+  
+  //         console.log("Received Data:", req.body); // ✅ ডাটা চেক
+  
+  //         if (!ObjectId.isValid(marathonId)) {
+  //             return res.status(400).json({ message: "Invalid marathonId" });
+  //         }
+  
+  //         // ✅ নতুন রেজিস্ট্রেশন তৈরি করা
+  //         const newRegistration = req.body
+  //         const insertResult = await registerCollection.insertOne(newRegistration);
+  //         console.log("new registration",newRegistration)
+  //         res.send(newRegistration)
+         
+  
+  //         // ✅ মোট রেজিস্ট্রেশন সংখ্যা ১ বাড়ানো
+  //         const updatedMarathon = await MerathonCOllection.findOneAndUpdate(
+  //             { _id: new ObjectId(marathonId) },
+  //             { $inc: { totalRegistrations: 1 } },
+  //             { returnDocument: 'after' }
+  //         );
+  
+  //         if (!updatedMarathon.value) {
+  //             return res.status(404).json({ message: "Marathon not found" });
+  //         }
+  
+  //         res.status(200).json({ 
+  //             message: 'Registration successful', 
+  //             updatedTotal: updatedMarathon.value.totalRegistrations 
+  //         });
+  
+  //     } catch (error) {
+  //         console.error('Registration Error:', error);
+  //         res.status(500).json({ message: 'Registration failed', error: error.message });
+  //     }
+  // });
+  
+    
+    
+
+    
+      // app.post('/register', async (req, res) => {
+      //   const merathonData = req.body
+      //   const result = await registerCollection.insertOne(merathonData)
+      //   console.log(result)
+      //   res.send(result)
+      // })
+
+      app.get('/register', async (req, res) => {
+        const result = await registerCollection.find().toArray()
         res.send(result)
       })
+
 
       app.get('/dashboard', async (req, res) => {
         const result = await registerCollection.find().toArray()
